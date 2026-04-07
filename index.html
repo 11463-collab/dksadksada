@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Lobby Dakon Online</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: linear-gradient(135deg, #667eea, #764ba2); display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .lobby-card { background: white; padding: 2rem; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); width: 350px; text-align: center; }
+        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; margin: 5px 0; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        .btn-host { background: #764ba2; color: white; }
+        .btn-guest { background: #00b894; color: white; }
+        .divider { margin: 15px 0; color: #999; font-size: 0.8rem; }
+    </style>
+</head>
+<body>
+
+    <div class="lobby-card">
+        <h2>🎮 Dakon Online</h2>
+        <input type="text" id="playerName" placeholder="Masukkan Nama Anda">
+        <input type="text" id="roomID" placeholder="ID Room (Contoh: SERU123)">
+        
+        <button class="btn-host" onclick="startAsHost()">Buat Room Baru (Host)</button>
+        <div class="divider">ATAU</div>
+        <button class="btn-guest" onclick="startAsGuest()">Gabung Room (Guest)</button>
+    </div>
+
+   <script>
+        // 1. KONFIGURASI SUPABASE
+        // Gunakan nama 'supabaseClient' agar tidak bentrok dengan library 'supabase' dari CDN
+        const SUPABASE_URL = 'https://yifnqncmsgbkvvjdgwae.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_F47wIask3Ld1QT8Hfvgu-Q_hxHPnYRj';
+        
+        // Gunakan window.supabase untuk memanggil library yang sudah dimuat di <head>
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // 2. FUNGSI UNTUK HOST (MEMBUAT SERVER)
+        // --- FUNGSI UNTUK HOST (MEMBUAT SERVER) ---
+        async function startAsHost() {
+            const name = document.getElementById('playerName').value;
+            const room = document.getElementById('roomID').value;
+
+            if (!name || !room) return alert("Isi nama dan ID Room!");
+
+            // Simpan data Host ke Supabase
+            const { error } = await supabaseClient
+                .from('rooms')
+                .upsert({ 
+                    room_id: room, 
+                    host_name: name, // Simpan nama host
+                    guest_name: null, // Reset guest jika room dibuat ulang
+                    last_move: null, 
+                    last_move_by: null 
+                });
+
+            if (error) {
+                alert("Gagal membuat room: " + error.message);
+            } else {
+                // PERUBAHAN DISINI: Arahkan ke lobby.html, bukan game.html
+                window.location.href = `lobby.html?role=host&room=${room}&hostName=${name}`;
+            }
+        }
+
+        // --- FUNGSI UNTUK GUEST (JOIN SERVER) ---
+        async function startAsGuest() {
+            const name = document.getElementById('playerName').value;
+            const room = document.getElementById('roomID').value;
+
+            if (!name || !room) return alert("Isi nama dan ID Room!");
+
+            // Cek apakah room ada
+            const { data, error } = await supabaseClient
+                .from('rooms')
+                .select('room_id')
+                .eq('room_id', room)
+                .maybeSingle();
+
+            if (data) {
+                // Update nama guest di Supabase agar Host tahu ada yang join
+                await supabaseClient
+                    .from('rooms')
+                    .update({ guest_name: name })
+                    .eq('room_id', room);
+
+                // PERUBAHAN DISINI: Arahkan ke lobby.html, bukan game.html
+                window.location.href = `lobby.html?role=guest&room=${room}&myName=${name}`;
+            } else {
+                alert("Room tidak ditemukan! Pastikan Host sudah membuat room.");
+            }
+        }
+</script>
+</body>
+</html>

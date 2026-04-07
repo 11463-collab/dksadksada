@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Dakon Pro - Battle Online</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        /* STYLE TETAP SAMA SEPERTI SEBELUMNYA */
+        body { font-family: 'Segoe UI', sans-serif; background: linear-gradient(135deg, #667eea, #764ba2); min-height: 100vh; margin: 0; padding: 20px; color: #333; }
+        .section { background: rgba(255, 255, 255, 0.95); border-radius: 25px; padding: 2rem; max-width: 1200px; margin: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+        .game-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .player-info { background: #dfe6e9; padding: 15px; border-radius: 15px; min-width: 150px; text-align: center; transition: 0.3s; }
+        .current-player { background: #764ba2 !important; color: white; transform: scale(1.05); }
+        .dakwa-board { display: flex; align-items: center; gap: 15px; background: #8d5524; padding: 30px; border-radius: 100px; border: 10px solid #5d3a1a; margin: 20px auto; justify-content: center;}
+        .board-pits { display: grid; grid-template-columns: repeat(7, 1fr); grid-template-rows: repeat(2, 1fr); gap: 15px; flex-grow: 1; }
+        .pit { width: 70px; height: 70px; background: #b2bec3; border: 4px solid #636e72; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: bold; cursor: not-allowed; transition: 0.3s; position: relative; }
+        .store { width: 100px; height: 180px; background: #f39c12; border-radius: 50px; border: 5px solid #d68910; display: flex; align-items: center; justify-content: center; color: white; font-size: 2.5rem; font-weight: 900; }
+        .active-p1 { background: #a29bfe !important; border-color: #6c5ce7 !important; cursor: pointer !important; }
+        .active-p2 { background: #ff7675 !important; border-color: #d63031 !important; cursor: pointer !important; }
+        .notification { position: fixed; top: 20px; right: 20px; background: #00b894; color: white; padding: 15px 25px; border-radius: 10px; display: none; z-index: 1000; }
+        .controls { text-align: center; margin-top: 20px; }
+        button { padding: 12px 25px; border-radius: 10px; border: none; cursor: pointer; font-weight: bold; margin: 5px; }
+    </style>
+</head>
+<body>
+    <div id="notif" class="notification"></div>
+    <div class="section">
+        <div class="game-info">
+            <div class="player-info" id="p1-info">
+                <div id="p1-name">Host</div>
+                <h2 id="p1-score">0</h2>
+            </div>
+            <div style="text-align: center">
+                <h3 id="status">Menghubungkan...</h3>
+                <small id="room-display"></small>
+            </div>
+            <div class="player-info" id="p2-info">
+                <div id="p2-name">Guest</div>
+                <h2 id="p2-score">0</h2>
+            </div>
+        </div>
+        <div id="board-container"></div>
+        <div class="controls">
+            <button onclick="window.location.href='index.html'" style="background:#e74c3c; color:white;">🚪 Keluar</button>
+        </div>
+    </div>
+
+    <script>
+        // --- KONFIGURASI SUPABASE ---
+        const SUPABASE_URL = 'https://yifnqncmsgbkvvjdgwae.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_F47wIask3Ld1QT8Hfvgu-Q_hxHPnYRj';
+        
+        // Gunakan pengecekan agar tidak error jika library belum siap
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // 2. TAMBAHKAN FUNGSI INI (Fungsi yang hilang)
+        function startAsHost() {
+            const room = document.getElementById('roomInput')?.value || Math.random().toString(36).substring(7);
+            const name = document.getElementById('nameInput')?.value || "Host";
+            window.location.search = `?role=host&room=${room}&hostName=${name}`;
+        }
+
+        const params = new URLSearchParams(window.location.search);
+        const myRole = params.get('role');
+        const roomID = params.get('room');
+        const hName = params.get('hostName') || "Host";
+        const gName = params.get('myName') || "Guest";
+
+        class DakonGame {
+            constructor() {
+                this.board = Array(16).fill(7);
+                this.board[7] = 0; 
+                this.board[15] = 0; 
+                this.currentPlayer = 1;
+                this.gameActive = true;
+                this.animationRunning = false;
+                
+                document.getElementById('p1-name').textContent = hName + (myRole === 'host' ? " (Anda)" : "");
+                document.getElementById('p2-name').textContent = gName + (myRole === 'guest' ? " (Anda)" : "");
+                document.getElementById('room-display').textContent = "Room: " + roomID;
+
+                this.renderBoard();
+                this.updateUI();
+                this.initRealtime();
+            }
+
+            // MODIFIKASI: Sinkronisasi via Supabase
+            async initRealtime() {
+                // Buat baris room jika belum ada (khusus host)
+                if(myRole === 'host') {
+                    await supabaseClient.from('rooms').upsert({ room_id: roomID });
+                }
+
+                // Berlangganan perubahan data
+                supabaseClient
+                    .channel(`room_${roomID}`)
+                    .on('postgres_changes', { 
+                        event: 'UPDATE', 
+                        schema: 'public', 
+                        table: 'rooms', 
+                        filter: `room_id=eq.${roomID}` 
+                    }, payload => {
+                        const data = payload.new;
+                        if (data.last_move_by !== myRole && data.last_move !== null) {
+                            this.makeMove(data.last_move, false); // Jalankan animasi lawan
+                        }
+                    })
+                    .subscribe();
+            }
+
+            async broadcastAction(index) {
+                await supabaseClient
+                    .from('rooms')
+                    .update({ 
+                        last_move: index, 
+                        last_move_by: myRole,
+                        updated_at: new Date() 
+                    })
+                    .eq('room_id', roomID);
+            }
+
+            // LOGIKA GAME (Sama seperti sebelumnya)
+            showNotif(msg) {
+                const el = document.getElementById('notif');
+                el.textContent = msg; el.style.display = 'block';
+                setTimeout(() => el.style.display = 'none', 2000);
+            }
+
+            renderBoard() {
+                const container = document.getElementById('board-container');
+                container.innerHTML = '';
+                const boardEl = document.createElement('div');
+                boardEl.className = 'dakwa-board';
+                boardEl.appendChild(this.createStore(15));
+                const pitsGrid = document.createElement('div');
+                pitsGrid.className = 'board-pits';
+                for(let i = 14; i >= 8; i--) pitsGrid.appendChild(this.createPit(i));
+                for(let i = 0; i <= 6; i++) pitsGrid.appendChild(this.createPit(i));
+                boardEl.appendChild(pitsGrid);
+                boardEl.appendChild(this.createStore(7));
+                container.appendChild(boardEl);
+            }
+
+            createPit(index) {
+                const pit = document.createElement('div');
+                pit.className = 'pit';
+                pit.id = `pit-${index}`;
+                pit.textContent = this.board[index];
+                const isP1 = index <= 6;
+                const isP2 = index >= 8 && index <= 14;
+
+                if (this.gameActive && !this.animationRunning && this.board[index] > 0) {
+                    if (this.currentPlayer === 1 && isP1 && myRole === 'host') {
+                        pit.classList.add('active-p1');
+                        pit.onclick = () => this.makeMove(index, true);
+                    } else if (this.currentPlayer === 2 && isP2 && myRole === 'guest') {
+                        pit.classList.add('active-p2');
+                        pit.onclick = () => this.makeMove(index, true);
+                    }
+                }
+                return pit;
+            }
+
+            createStore(index) {
+                const store = document.createElement('div');
+                store.className = 'store';
+                store.id = `pit-${index}`;
+                store.textContent = this.board[index];
+                return store;
+            }
+
+            async makeMove(index, shouldBroadcast = false) {
+                if (this.animationRunning) return;
+                this.animationRunning = true;
+
+                if (shouldBroadcast) this.broadcastAction(index);
+
+                let cur = index;
+                let seeds = this.board[index];
+                this.board[index] = 0;
+                document.getElementById(`pit-${index}`).textContent = "0";
+
+                while (seeds > 0) {
+                    await new Promise(r => setTimeout(r, 300));
+                    cur = (cur + 1) % 16;
+                    if ((this.currentPlayer === 1 && cur === 15) || (this.currentPlayer === 2 && cur === 7)) {
+                        cur = (cur + 1) % 16;
+                    }
+                    this.board[cur]++;
+                    const el = document.getElementById(`pit-${cur}`);
+                    el.textContent = this.board[cur];
+                    el.style.transform = "scale(1.2)";
+                    setTimeout(() => el.style.transform = "scale(1)", 150);
+                    seeds--;
+                }
+
+                const myStore = this.currentPlayer === 1 ? 7 : 15;
+                if (cur !== 7 && cur !== 15 && this.board[cur] > 1) {
+                    this.animationRunning = false;
+                    await new Promise(r => setTimeout(r, 400));
+                    this.makeMove(cur, false);
+                    return;
+                } 
+
+                const isMySide = (this.currentPlayer === 1 && cur <= 6) || (this.currentPlayer === 2 && cur >= 8 && cur <= 14);
+                if (isMySide && this.board[cur] === 1) {
+                    const opp = 14 - cur;
+                    if (this.board[opp] > 0) {
+                        this.board[myStore] += (this.board[cur] + this.board[opp]);
+                        this.board[cur] = 0; this.board[opp] = 0;
+                        this.showNotif("NEMBAK! 🎯");
+                    }
+                }
+
+                if (cur !== myStore) this.currentPlayer = 3 - this.currentPlayer;
+                else this.showNotif("Bonus Giliran! ✨");
+
+                this.animationRunning = false;
+                this.updateUI();
+                this.renderBoard();
+                this.checkGameOver();
+            }
+
+            updateUI() {
+                document.getElementById('p1-score').textContent = this.board[7];
+                document.getElementById('p2-score').textContent = this.board[15];
+                document.getElementById('p1-info').className = `player-info ${this.currentPlayer === 1 ? 'current-player' : ''}`;
+                document.getElementById('p2-info').className = `player-info ${this.currentPlayer === 2 ? 'current-player' : ''}`;
+                const name = this.currentPlayer === 1 ? hName : gName;
+                document.getElementById('status').textContent = "Giliran: " + name;
+            }
+
+            checkGameOver() {
+                const p1Empty = this.board.slice(0, 7).every(s => s === 0);
+                const p2Empty = this.board.slice(8, 15).every(s => s === 0);
+                if (p1Empty || p2Empty) {
+                    this.gameActive = false;
+                    for(let i=0; i<7; i++) { this.board[7] += this.board[i]; this.board[i]=0; }
+                    for(let i=8; i<15; i++) { this.board[15] += this.board[i]; this.board[i]=0; }
+                    this.renderBoard();
+                    alert("Game Over!");
+                }
+            }
+        }
+
+        const game = new DakonGame();
+    </script>
+</body>
+</html>
