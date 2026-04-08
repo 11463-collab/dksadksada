@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Lobby Dakon Online</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        /* ... Style tetap sama seperti kode Anda ... */
+        body { font-family: 'Segoe UI', sans-serif; background: linear-gradient(135deg, #667eea, #764ba2); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
+        .container { display: flex; gap: 20px; max-width: 800px; width: 100%; flex-wrap: wrap; justify-content: center; }
+        .lobby-card { background: white; padding: 2rem; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); width: 350px; text-align: center; }
+        .server-list-card { background: white; padding: 1.5rem; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); width: 500px; max-height: 400px; overflow-y: auto; }
+        .server-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee; transition: 0.2s; }
+        .server-item:hover { background: #f9f9f9; }
+        .server-info { text-align: left; }
+        .server-name { font-weight: bold; color: #764ba2; display: block; }
+        .server-host { font-size: 0.8rem; color: #666; }
+        .btn-join-small { background: #00b894; color: white; border: none; padding: 5px 12px; border-radius: 5px; cursor: pointer; font-size: 0.8rem; width: 100px; }
+        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; margin: 5px 0; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        .btn-host { background: #764ba2; color: white; }
+        .btn-guest { background: #00b894; color: white; }
+        .divider { margin: 15px 0; color: #999; font-size: 0.8rem; }
+        .empty-msg { color: #999; font-style: italic; margin-top: 20px; font-size: 0.9rem; }
+        .badge-lock { font-size: 0.7rem; background: #ffeaa7; color: #d63031; padding: 2px 5px; border-radius: 4px; margin-left: 5px; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="lobby-card">
+            <h2>🎮 Dakon Online</h2>
+            <input type="text" id="playerName" placeholder="Masukkan Nama Anda">
+            <p>----(Pilih Opsi)----</p>           
+            <button class="btn-host" onclick="startAsHost()">Buat Room Baru (Host)</button>
+            <div class="divider">ATAU</div>
+            <input type="text" id="roomID" placeholder="ID Room">
+            <button class="btn-guest" onclick="startAsGuest()">Gabung Room Manual</button>
+        </div>
+
+        <div class="server-list-card">
+            <h3>🌐 Server Aktif</h3>
+            <div id="serverListContainer">
+                <p class="empty-msg">Mencari server...</p>
+            </div>
+            <button onclick="fetchActiveServers()" style="background: #eee; color: #333; margin-top: 10px; font-size: 0.7rem; padding: 5px;">🔄 Refresh List</button>
+        </div>
+    </div>
+
+   <script>
+        const SUPABASE_URL = 'https://yifnqncmsgbkvvjdgwae.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_F47wIask3Ld1QT8Hfvgu-Q_hxHPnYRj';
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        
+        async function generateRandomString(length) {
+            const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            let result = '';
+            for (let i = 0; i < length; i++) {
+                result += characters.charAt(Math.floor(Math.random() * characters.length));
+            }
+            return result;
+        }
+
+        // --- UBAH DI SINI: Fetch Active Servers ---
+        async function fetchActiveServers() {
+            const container = document.getElementById('serverListContainer');
+            
+            // Perubahan: Tambahkan filter .eq('is_public', true)
+            const { data, error } = await supabaseClient
+                .from('rooms')
+                .select('room_id, host_name, password')
+                .is('guest_name', null)
+                .eq('is_public', true) // Hanya ambil yang diset PUBLIC
+                .order('created_at', { ascending: false })
+                .limit(10);
+
+            if (error) return console.error(error);
+
+            if (!data || data.length === 0) {
+                container.innerHTML = '<p class="empty-msg">Tidak ada server publik tersedia.</p>';
+                return;
+            }
+
+            container.innerHTML = '';
+            data.forEach(srv => {
+                const isLocked = srv.password && srv.password.trim() !== "";
+                const item = document.createElement('div');
+                item.className = 'server-item';
+                item.innerHTML = `
+                    <div class="server-info">
+                        <span class="server-name">${srv.room_id} ${isLocked ? '<span class="badge-lock">🔒 Lock</span>' : ''}</span>
+                        <span class="server-host">Host: ${srv.host_name}</span>
+                    </div>
+                    <button class="btn-join-small" onclick="quickJoin('${srv.room_id}', ${isLocked})">Join</button>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        // --- UBAH DI SINI: Quick Join dengan Cek Password ---
+        async function quickJoin(roomName, isLocked) {
+            const name = document.getElementById('playerName').value;
+            if (!name) return alert("Masukkan nama Anda dulu!");
+
+            if (isLocked) {
+                // Ambil data room untuk verifikasi password
+                const { data } = await supabaseClient.from('rooms').select('password').eq('room_id', roomName).single();
+                const passInput = prompt("Room ini diproteksi password. Masukkan password:");
+                
+                if (passInput !== data.password) {
+                    return alert("Password salah!");
+                }
+            }
+            
+            document.getElementById('roomID').value = roomName;
+            startAsGuest();
+        }
+
+        async function startAsHost() {
+            const name = document.getElementById('playerName').value;
+            const room = await generateRandomString(10);
+            if (!name) return alert("Isi nama kamu!");
+
+            // Perubahan: Tambahkan default is_public: true
+            const { error } = await supabaseClient
+                .from('rooms')
+                .upsert({ 
+                    room_id: room, 
+                    host_name: name, 
+                    guest_name: null,
+                    is_public: true, // Default awal adalah publik
+                    is_started: false,
+                    created_at: new Date()
+                });
+
+            if (error) alert("Gagal: " + error.message);
+            else window.location.href = `lobby.html?role=host&room=${room}&hostName=${name}`;
+        }
+
+        async function startAsGuest() {
+            const name = document.getElementById('playerName').value;
+            const room = document.getElementById('roomID').value;
+            if (!name || !room) return alert("Isi nama dan ID Room!");
+
+            // Perubahan: Ambil password juga untuk pengecekan manual join
+            const { data } = await supabaseClient
+                .from('rooms')
+                .select('room_id, password')
+                .eq('room_id', room)
+                .maybeSingle();
+
+            if (data) {
+                // Jika join manual (ketik ID) dan room punya password
+                if (data.password && data.password.trim() !== "") {
+                    const passInput = prompt("Masukkan Password Room:");
+                    if (passInput !== data.password) return alert("Password salah!");
+                }
+
+                await supabaseClient.from('rooms').update({ guest_name: name }).eq('room_id', room);
+                window.location.href = `lobby.html?role=guest&room=${room}&myName=${name}`;
+            } else {
+                alert("Room tidak ditemukan!");
+            }
+        }
+
+        fetchActiveServers();
+        setInterval(fetchActiveServers, 5000);
+</script>
+</body>
+</html>
