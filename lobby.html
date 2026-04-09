@@ -13,6 +13,8 @@
             --success: #2ecc71;
             --danger: #e74c3c;
             --glass: rgba(255, 255, 255, 0.9);
+            --aws-color: #3498db;
+            --kor-color: #9b59b6;
         }
 
         body { 
@@ -53,6 +55,19 @@
         }
         .room-id-tag:hover { background: #ccc; cursor: text;}
 
+        /* Server Badge */
+        .server-badge {
+            font-size: 0.7rem;
+            padding: 3px 10px;
+            border-radius: 10px;
+            color: white;
+            margin-left: 8px;
+            vertical-align: middle;
+            text-transform: uppercase;
+        }
+        .bg-aws { background: var(--aws-color); }
+        .bg-kor { background: var(--kor-color); }
+
         .player-container { 
             display: flex; 
             gap: 20px; 
@@ -76,7 +91,6 @@
         .player-box b { display: block; font-size: 0.8rem; text-transform: uppercase; color: #636e72; letter-spacing: 1px; }
         .player-box .name { font-size: 1.1rem; font-weight: 800; margin-top: 5px; }
 
-        /* Status Badges */
         .badge {
             position: absolute;
             top: -12px;
@@ -99,7 +113,6 @@
             100% { transform: translateX(-50%) scale(1); }
         }
 
-        /* Settings Panel */
         .settings-panel { 
             background: rgba(0,0,0,0.03); 
             border-radius: 20px; 
@@ -118,7 +131,6 @@
             font-family: inherit;
         }
 
-        /* Action Buttons */
         .btn {
             border: none;
             border-radius: 15px;
@@ -159,6 +171,7 @@
             <h2><i class="fa-solid fa-gamepad"></i> Dakon Lobby</h2>
             <div class="room-id-tag" onclick="copyRoomID()" title="Klik untuk salin">
                 <i class="fa-solid fa-hashtag"></i> <span id="roomTitle">ID: ...</span>
+                <span id="srvBadge" class="server-badge">...</span>
             </div>
         </div>
 
@@ -183,6 +196,12 @@
 
         <div id="hostSettings" class="settings-panel" style="display: none;">
             <h4><i class="fa-solid fa-sliders"></i> Pengaturan Room</h4>
+            
+            <div class="setting-item">
+                <span><i class="fa-solid fa-server"></i> Lokasi Server</span>
+                <b id="displayServer" style="color: var(--primary);">AWS (Singapore)</b>
+            </div>
+
             <div class="setting-item">
                 <span><i class="fa-solid fa-eye"></i> Visibilitas</span>
                 <select id="visibilitySelect" onchange="updateRoomSettings()">
@@ -204,15 +223,36 @@
     </div>
 
     <script>
-        const SUPABASE_URL = 'https://yifnqncmsgbkvvjdgwae.supabase.co';
-        const SUPABASE_KEY = 'sb_publishable_F47wIask3Ld1QT8Hfvgu-Q_hxHPnYRj';
-        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        // CONFIG MULTI-SERVER
+        const SERVERS = {
+            AWS: {
+                url: 'https://yifnqncmsgbkvvjdgwae.supabase.co',
+                key: 'sb_publishable_F47wIask3Ld1QT8Hfvgu-Q_hxHPnYRj'
+            },
+            KOR: {
+                url: 'https://qouaeainjscoidchwtgm.supabase.co',
+                key: 'sb_publishable_3O3MN8Kvk__XDfwe5CO_Ug_ux1g33l-'
+            }
+        };
 
         const p = new URLSearchParams(window.location.search);
         const room = p.get('room');
         const role = p.get('role');
+        const selectedServer = p.get('server') || 'SIN'; // Ambil server dari URL
+
+        // Inisialisasi Supabase berdasarkan server yang dipilih
+        const supabaseClient = window.supabase.createClient(
+            SERVERS[selectedServer].url, 
+            SERVERS[selectedServer].key
+        );
+
         let isRedirecting = false;
         let isPlayerReady = false;
+
+        // UI Initialization
+        document.getElementById('srvBadge').textContent = selectedServer;
+        document.getElementById('srvBadge').classList.add(selectedServer === 'SIN' ? 'bg-aws' : 'bg-kor');
+        document.getElementById('displayServer').textContent = selectedServer === 'SIN' ? 'AWS (Singapore)' : 'KOR (Seoul)';
 
         if(role === 'host') {
             document.getElementById('hostSettings').style.display = 'block';
@@ -251,7 +291,7 @@
             
             if (!data) {
                 if (!isRedirecting) {
-                    alert("Room sudah tidak aktif.");
+                    alert("Room sudah tidak aktif atau Host telah keluar.");
                     window.location.href = 'index.html';
                 }
                 return;
@@ -301,7 +341,8 @@
 
             if(data.is_started) {
                 isRedirecting = true;
-                window.location.href = `8912308B123XJ/game.html?role=${role}&room=${room}&hostName=${data.host_name}&myName=${role==='host'?data.host_name:data.guest_name}`;
+                // Mengirim info server ke halaman game
+                window.location.href = `8912308B123XJ/game.html?role=${role}&room=${room}&server=${selectedServer}&hostName=${data.host_name}&myName=${role==='host'?data.host_name:data.guest_name}`;
             }
         }
 
@@ -312,7 +353,8 @@
 
         window.addEventListener('beforeunload', async () => {
             if(role === 'host' && !isRedirecting) {
-                const url = `${SUPABASE_URL}/rest/v1/rooms?room_id=eq.${room}`;
+                // Gunakan Beacon API untuk menghapus room jika tab ditutup mendadak
+                const url = `${SERVERS[selectedServer].url}/rest/v1/rooms?room_id=eq.${room}`;
                 navigator.sendBeacon(url, JSON.stringify({ method: 'DELETE' }));
             }
         });
