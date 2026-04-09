@@ -1,10 +1,29 @@
-const SUPABASE_URL = 'https://yifnqncmsgbkvvjdgwae.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_F47wIask3Ld1QT8Hfvgu-Q_hxHPnYRj';
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+/**
+ * scfores.js - Dakon Online Engine
+ * Mendukung Multi-Server (AWS & KOR)
+ */
 
+// 1. KONFIGURASI DUA SERVER
+const SERVERS = {
+    AWS: {
+        url: 'https://yifnqncmsgbkvvjdgwae.supabase.co',
+        key: 'sb_publishable_F47wIask3Ld1QT8Hfvgu-Q_hxHPnYRj'
+    },
+    KOR: {
+        url: 'https://qouaeainjscoidchwtgm.supabase.co',
+        key: 'sb_publishable_3O3MN8Kvk__XDfwe5CO_Ug_ux1g33l-'
+    }
+};
+
+// 2. AMBIL PARAMETER DARI URL
 const params = new URLSearchParams(window.location.search);
 const myRole = params.get('role'); // 'host' atau 'guest'
 const roomID = params.get('room');
+const selectedServer = params.get('server') || 'AWS'; // Default ke AWS jika tidak ada
+
+// 3. INISIALISASI CLIENT BERDASARKAN SERVER YANG DIPILIH
+const currentConfig = SERVERS[selectedServer] || SERVERS.AWS;
+const supabaseClient = window.supabase.createClient(currentConfig.url, currentConfig.key);
 
 class DakonGame {
     constructor() {
@@ -21,7 +40,7 @@ class DakonGame {
     }
 
     async initGame() {
-        // 1. Ambil Nama & Status awal dari DB
+        // 1. Ambil Nama & Status awal dari DB (Server yang dipilih)
         const { data, error } = await supabaseClient.from('rooms').select('*').eq('room_id', roomID).single();
         
         if (error || !data || data.status === 'finished') {
@@ -34,7 +53,9 @@ class DakonGame {
         this.guestName = data.guest_name;
         document.getElementById('p1-name').textContent = this.hostName;
         document.getElementById('p2-name').textContent = this.guestName;
-        document.getElementById('room-display').textContent = "ROOM ID: " + roomID;
+        
+        // Tampilkan info Room dan Server di UI
+        document.getElementById('room-display').innerHTML = `ROOM ID: ${roomID} <b style="color:#764ba2">(${selectedServer})</b>`;
 
         // 2. Setup Koneksi Internet Monitoring
         this.setupConnectivityListeners();
@@ -112,7 +133,7 @@ class DakonGame {
         this.gameActive = false;
         this.animationRunning = true;
         alert(msg);
-        window.location.href = 'https://congklak.benevolentclass.my.id/';
+        window.location.href = 'https://congklak.benevolentclass.my.id/index';
     }
 
     processSuitResult(h, g) {
@@ -291,11 +312,15 @@ class DakonGame {
     }
 }
 
+// Fungsi Suit Global
 async function submitSuit(choice) {
     const col = myRole === 'host' ? 'suit_host' : 'suit_guest';
     document.getElementById('suit-msg').textContent = "Menunggu lawan...";
     Array.from(document.getElementsByClassName('suit-btn')).forEach(b => b.disabled = true);
+    
+    // Kirim data suit ke server yang sedang aktif
     await supabaseClient.from('rooms').update({ [col]: choice }).eq('room_id', roomID);
 }
 
+// Start Game Engine
 const game = new DakonGame();
