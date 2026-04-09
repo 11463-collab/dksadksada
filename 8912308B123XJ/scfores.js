@@ -112,7 +112,7 @@ class DakonGame {
         this.gameActive = false;
         this.animationRunning = true;
         alert(msg);
-        window.location.href = 'index.html';
+        window.location.href = 'https://congklak.benevolentclass.my.id/';
     }
 
     processSuitResult(h, g) {
