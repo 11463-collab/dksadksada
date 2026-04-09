@@ -2,178 +2,200 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="description" content="Tradisi tak pernah semodern ini. Unduh dan mainkan Dakon Benevolent hari ini!">
-    <title>Lobby Dakon Online</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lobby Dakon - Congklak Benevolent</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: linear-gradient(135deg, #667eea, #764ba2); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
-        .container { display: flex; gap: 20px; max-width: 800px; width: 100%; flex-wrap: wrap; justify-content: center; }
-        .lobby-card { background: white; padding: 2rem; border-radius: 20px; box-shadow: 2px 10px 30px rgba(0, 0, 0, 0.501); width: 350px; text-align: center; height: 370px;}
-        .server-list-card { background: white; padding: 1.5rem; border-radius: 20px; box-shadow: 2px 10px 30px rgba(0,0,0,0.3); width: 500px; max-height: 400px; overflow-y: auto; }
-        .server-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee; transition: 0.2s; }
-        .server-item:hover { background: #f9f9f9; }
-        .server-info { text-align: left; }
-        .server-name { font-weight: bold; color: #764ba2; display: block; }
-        .server-host { font-size: 0.8rem; color: #666; }
-        .btn-join-small { background: #00b894; color: white; border: none; padding: 5px 12px; border-radius: 5px; cursor: pointer; font-size: 0.8rem; width: 100px; }
-        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; box-shadow: 4px 4px 10px rgba(105, 102, 102, 0.75);}
-        button { width: 100%; padding: 12px; margin: 5px 0; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.3s; border-bottom: 5px solid rgba(35, 30, 30, 0.402);}
-        button:hover {border-bottom: 2px solid rgba(35, 30, 30, 0.402);}
+        .container { display: flex; gap: 20px; max-width: 900px; width: 100%; flex-wrap: wrap; justify-content: center; }
+        
+        /* Glassmorphism Effect */
+        .lobby-card, .server-list-card { background: rgba(255, 255, 255, 0.95); padding: 2rem; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.2); }
+        .lobby-card { width: 320px; text-align: center; }
+        .server-list-card { width: 500px; max-height: 500px; overflow-y: auto; }
+
+        /* Server Item Styling */
+        .server-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #eee; transition: 0.2s; border-radius: 10px; margin-bottom: 5px; }
+        .server-item:hover { background: #f1f2f6; }
+        
+        .server-info { text-align: left; flex-grow: 1; }
+        .server-name { font-weight: bold; color: #2d3436; display: flex; align-items: center; gap: 8px; }
+        .server-host { font-size: 0.75rem; color: #636e72; display: block; margin-top: 2px; }
+
+        /* Badges */
+        .badge-srv { font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; color: white; font-weight: bold; text-transform: uppercase; }
+        .bg-aws { background: #3498db; } /* Biru untuk AWS */
+        .bg-kor { background: #9b59b6; } /* Ungu untuk KOR */
+        .badge-lock { font-size: 0.7rem; color: #e17055; }
+
+        /* Form Styling */
+        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 10px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; margin: 5px 0; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; transition: 0.3s; border-bottom: 4px solid rgba(0,0,0,0.2); }
+        button:hover { transform: translateY(2px); border-bottom: 1px solid rgba(0,0,0,0.2); }
+        
         .btn-host { background: #764ba2; color: white; }
         .btn-guest { background: #00b894; color: white; }
-        .divider { margin: 15px 0; color: #999; font-size: 0.8rem; }
-        .empty-msg { color: #999; font-style: italic; margin-top: 20px; font-size: 0.9rem; }
-        .badge-lock { font-size: 0.7rem; background: #ffeaa7; color: #d63031; padding: 2px 5px; border-radius: 4px; margin-left: 5px; }
-        .stat-card { flex: 1; padding: 15px; border-radius: 8px; color: rgb(0, 0, 0); text-align: center; background-color: white; border-top: 5px solid; box-shadow: 0 2px 4px rgba(0,0,0,0.1);}
-        .bg-blue { border-color: #3498db; }
-        .bg-green { border-color: #2ecc71; }
-        .bg-red { border-color: #e74c3c; }
-        .infoplayer {border-radius: 10px; border-bottom: 6px solid rgba(35, 30, 30, 0.402);}
+        .btn-join-small { background: #0984e3; color: white; border: none; padding: 6px 15px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; width: auto; }
+        
+        .divider { margin: 15px 0; color: #b2bec3; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; }
+        .empty-msg { color: #b2bec3; text-align: center; padding: 20px; font-style: italic; }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <div class="lobby-card  infoplayer">
-            <h2>🎮 Dakon Online</h2>
-            <input type="text" id="playerName" placeholder="Masukkan Nama Anda">
-            <div class="divider">Bermain Dengan</div>       
-            <button class="btn-host" onclick="startAsHost()">Buat Room Baru (Host)</button>
-            <div class="divider">ATAU</div>
+        <div class="lobby-card">
+            <h2 style="color: #6c5ce7; margin-top:0;">🎮 Congklak Benevolent</h2>
+            <input type="text" id="playerName" placeholder="Nama Pemain">
+            
+            <div class="divider">Buat Room</div>
+            <select id="serverTarget" style="width:100%; padding:10px; border-radius:10px; margin-bottom:10px; border:1px solid #ddd;">
+                <option value="AWS">Server Northeast1 (Singapore)</option>
+                <option value="KOR">Server Northeast3 (Korea)</option>
+            </select>
+            <button class="btn-host" onclick="startAsHost()">Create Room</button>
+
+            <div class="divider">Join Manual</div>
             <input type="text" id="roomID" placeholder="ID Room">
-            <button class="btn-guest" onclick="startAsGuest()">Gabung Room Manual</button>
+            <button class="btn-guest" onclick="startAsGuest()">Join by ID</button>
         </div>
 
         <div class="server-list-card">
-            <h3>🌐 Server Aktif</h3>
+            <h3 style="margin-top:0; color: #2d3436;"><i class="fa-solid fa-earth-asia"></i> Daftar Server Online</h3>
             <div id="serverListContainer">
-                <p class="empty-msg">Mencari server...</p>
+                <p class="empty-msg">Mencari server di seluruh dunia...</p>
             </div>
-            <button onclick="fetchActiveServers()" style="background: #eee; color: #333; margin-top: 10px; font-size: 0.7rem; padding: 5px;">🔄 Refresh List</button>
+            <button onclick="fetchActiveServers()" style="background: transparent; color: #636e72; font-size: 0.75rem; border:none; text-decoration: underline; cursor:pointer;">🔄 Refresh List</button>
         </div>
-        <footer style="text-align:center; margin-top:20px; color:#999; font-size:0.9rem;">
-    &copy; Affan Eka Pradybta, All rights reserved.
-</footer>
     </div>
 
-   <script>
-        const SUPABASE_URL = 'https://yifnqncmsgbkvvjdgwae.supabase.co';
-        const SUPABASE_KEY = 'sb_publishable_F47wIask3Ld1QT8Hfvgu-Q_hxHPnYRj';
-        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        
-        async function generateRandomString(length) {
-            const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-            let result = '';
-            for (let i = 0; i < length; i++) {
-                result += characters.charAt(Math.floor(Math.random() * characters.length));
-            }
-            return result;
-        }
+<script>
+    // KONFIGURASI DUA SERVER
+    const S1_CONF = {
+        url: 'https://yifnqncmsgbkvvjdgwae.supabase.co',
+        key: 'sb_publishable_F47wIask3Ld1QT8Hfvgu-Q_hxHPnYRj',
+        name: 'AWS'
+    };
+    const S2_CONF = {
+        url: 'https://qouaeainjscoidchwtgm.supabase.co',
+        key: 'sb_publishable_3O3MN8Kvk__XDfwe5CO_Ug_ux1g33l-',
+        name: 'KOR'
+    };
 
-        // --- UBAH DI SINI: Fetch Active Servers ---
-        async function fetchActiveServers() {
-            const container = document.getElementById('serverListContainer');
-            
-            // Perubahan: Tambahkan filter .eq('is_public', true)
-            const { data, error } = await supabaseClient
-                .from('rooms')
-                .select('room_id, host_name, password')
-                .is('guest_name', null)
-                .eq('is_public', true) // Hanya ambil yang diset PUBLIC
-                .order('created_at', { ascending: false })
-                .limit(10);
+    const clientAWS = window.supabase.createClient(S1_CONF.url, S1_CONF.key);
+    const clientKOR = window.supabase.createClient(S2_CONF.url, S2_CONF.key);
 
-            if (error) return console.error(error);
+    async function fetchActiveServers() {
+        const container = document.getElementById('serverListContainer');
+        try {
+            const [resAWS, resKOR] = await Promise.all([
+                clientAWS.from('rooms').select('room_id, host_name, password').is('guest_name', null).eq('is_public', true).limit(5),
+                clientKOR.from('rooms').select('room_id, host_name, password').is('guest_name', null).eq('is_public', true).limit(5)
+            ]);
 
-            if (!data || data.length === 0) {
-                container.innerHTML = '<p class="empty-msg">Tidak ada server publik tersedia.</p>';
+            // KONSISTENSI: Menggunakan AWS dan KOR
+            const allRooms = [
+                ...(resAWS.data || []).map(r => ({ ...r, origin: 'AWS' })),
+                ...(resKOR.data || []).map(r => ({ ...r, origin: 'KOR' }))
+            ];
+
+            if (allRooms.length === 0) {
+                container.innerHTML = '<p class="empty-msg">Tidak ada room publik saat ini.</p>';
                 return;
             }
 
             container.innerHTML = '';
-            data.forEach(srv => {
+            allRooms.forEach(srv => {
                 const isLocked = srv.password && srv.password.trim() !== "";
+                const badgeClass = srv.origin === 'AWS' ? 'bg-aws' : 'bg-kor';
+                
                 const item = document.createElement('div');
                 item.className = 'server-item';
                 item.innerHTML = `
                     <div class="server-info">
-                        <span class="server-name">${srv.room_id} ${isLocked ? '<span class="badge-lock">🔒 Lock</span>' : ''}</span>
-                        <span class="server-host">Host: ${srv.host_name}</span>
+                        <span class="server-name">
+                            <span class="badge-srv ${badgeClass}">${srv.origin}</span>
+                            ${srv.room_id} 
+                            ${isLocked ? '<i class="fa-solid fa-lock badge-lock"></i>' : ''}
+                        </span>
+                        <span class="server-host">Host: <b>${srv.host_name}</b></span>
                     </div>
-                    <button class="btn-join-small" onclick="quickJoin('${srv.room_id}', ${isLocked})">Join</button>
+                    <button class="btn-join-small" onclick="quickJoin('${srv.room_id}', '${srv.origin}', ${isLocked})">Join</button>
                 `;
                 container.appendChild(item);
             });
+        } catch (err) {
+            container.innerHTML = '<p class="empty-msg">Gagal memuat daftar server.</p>';
+        }
+    }
+
+    async function quickJoin(roomID, origin, isLocked) {
+        const name = document.getElementById('playerName').value;
+        if (!name) return alert("Masukkan nama Anda!");
+
+        const targetClient = origin === 'AWS' ? clientAWS : clientKOR;
+
+        if (isLocked) {
+            const { data } = await targetClient.from('rooms').select('password').eq('room_id', roomID).single();
+            const passInput = prompt(`Room [${roomID}] diproteksi. Masukkan password:`);
+            if (passInput !== data.password) return alert("Password salah!");
         }
 
-        // --- UBAH DI SINI: Quick Join dengan Cek Password ---
-        async function quickJoin(roomName, isLocked) {
-            const name = document.getElementById('playerName').value;
-            if (!name) return alert("Masukkan nama Anda dulu!");
+        await targetClient.from('rooms').update({ guest_name: name }).eq('room_id', roomID);
+        window.location.href = `lobby.html?role=guest&room=${roomID}&server=${origin}&myName=${name}`;
+    }
 
-            if (isLocked) {
-                // Ambil data room untuk verifikasi password
-                const { data } = await supabaseClient.from('rooms').select('password').eq('room_id', roomName).single();
-                const passInput = prompt("Room ini diproteksi password. Masukkan password:");
-                
-                if (passInput !== data.password) {
-                    return alert("Password salah!");
-                }
-            }
-            
-            document.getElementById('roomID').value = roomName;
-            startAsGuest();
+    async function startAsHost() {
+        const name = document.getElementById('playerName').value;
+        const origin = document.getElementById('serverTarget').value; // AWS atau KOR
+        const roomID = Math.random().toString(36).substring(2, 12);
+        
+        if (!name) return alert("Isi nama kamu!");
+        const targetClient = origin === 'AWS' ? clientAWS : clientKOR;
+
+        const { error } = await targetClient.from('rooms').upsert({ 
+            room_id: roomID, 
+            host_name: name, 
+            is_public: true,
+            is_started: false,
+            created_at: new Date()
+        });
+
+        if (error) alert("Gagal: " + error.message);
+        else window.location.href = `lobby.html?role=host&room=${roomID}&server=${origin}&hostName=${name}`;
+    }
+
+    async function startAsGuest() {
+        const name = document.getElementById('playerName').value;
+        const roomID = document.getElementById('roomID').value;
+        if (!name || !roomID) return alert("Isi nama dan ID Room!");
+
+        const [checkAWS, checkKOR] = await Promise.all([
+            clientAWS.from('rooms').select('room_id, password').eq('room_id', roomID).maybeSingle(),
+            clientKOR.from('rooms').select('room_id, password').eq('room_id', roomID).maybeSingle()
+        ]);
+
+        let origin = null;
+        let roomData = null;
+
+        if (checkAWS.data) { origin = 'AWS'; roomData = checkAWS.data; }
+        else if (checkKOR.data) { origin = 'KOR'; roomData = checkKOR.data; }
+
+        if (!origin) return alert("Room tidak ditemukan!");
+        const targetClient = origin === 'AWS' ? clientAWS : clientKOR;
+
+        if (roomData.password && roomData.password.trim() !== "") {
+            const passInput = prompt("Masukkan Password Room:");
+            if (passInput !== roomData.password) return alert("Password salah!");
         }
 
-        async function startAsHost() {
-            const name = document.getElementById('playerName').value;
-            const room = await generateRandomString(10);
-            if (!name) return alert("Isi nama kamu!");
+        await targetClient.from('rooms').update({ guest_name: name }).eq('room_id', roomID);
+        window.location.href = `lobby.html?role=guest&room=${roomID}&server=${origin}&myName=${name}`;
+    }
 
-            // Perubahan: Tambahkan default is_public: true
-            const { error } = await supabaseClient
-                .from('rooms')
-                .upsert({ 
-                    room_id: room, 
-                    host_name: name, 
-                    guest_name: null,
-                    is_public: true, // Default awal adalah publik
-                    is_started: false,
-                    created_at: new Date()
-                });
-
-            if (error) alert("Gagal: " + error.message);
-            else window.location.href = `lobby.html?role=host&room=${room}&hostName=${name}`;
-        }
-
-        async function startAsGuest() {
-            const name = document.getElementById('playerName').value;
-            const room = document.getElementById('roomID').value;
-            if (!name || !room) return alert("Isi nama dan ID Room!");
-
-            // Perubahan: Ambil password juga untuk pengecekan manual join
-            const { data } = await supabaseClient
-                .from('rooms')
-                .select('room_id, password')
-                .eq('room_id', room)
-                .maybeSingle();
-
-            if (data) {
-                // Jika join manual (ketik ID) dan room punya password
-                if (data.password && data.password.trim() !== "") {
-                    const passInput = prompt("Masukkan Password Room:");
-                    if (passInput !== data.password) return alert("Password salah!");
-                }
-
-                await supabaseClient.from('rooms').update({ guest_name: name }).eq('room_id', room);
-                window.location.href = `lobby.html?role=guest&room=${room}&myName=${name}`;
-            } else {
-                alert("Room tidak ditemukan!");
-            }
-        }
-
-        fetchActiveServers();
-        setInterval(fetchActiveServers, 5000);
+    fetchActiveServers();
+    setInterval(fetchActiveServers, 10000);
 </script>
 </body>
 </html>
