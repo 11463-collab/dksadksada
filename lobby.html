@@ -251,8 +251,8 @@
 
         // UI Initialization
         document.getElementById('srvBadge').textContent = selectedServer;
-        document.getElementById('srvBadge').classList.add(selectedServer === 'SIN' ? 'bg-aws' : 'bg-kor');
-        document.getElementById('displayServer').textContent = selectedServer === 'SIN' ? 'AWS (Singapore)' : 'KOR (Seoul)';
+        document.getElementById('srvBadge').classList.add(selectedServer === 'AWS' ? 'bg-aws' : 'bg-kor');
+        document.getElementById('displayServer').textContent = selectedServer === 'AWS' ? 'AWS (Singapore)' : 'KOR (Seoul)';
 
         if(role === 'host') {
             document.getElementById('hostSettings').style.display = 'block';
