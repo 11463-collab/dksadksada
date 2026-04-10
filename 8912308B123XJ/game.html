@@ -2,26 +2,25 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Playing - Battle Online</title>
+    <title>Playing - Dakon Benevolent Online</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: linear-gradient(135deg, #667eea, #764ba2); min-height: 100vh; margin: 0; padding: 20px; color: #333; overflow-x: hidden; }
         .stat-card { flex: 1; padding: 15px; border-radius: 8px; color: rgb(0, 0, 0); text-align: center; background-color: white; border-top: 10px solid; box-shadow: 0 2px 4px rgba(0,0,0,0.1);}
-        .bg-blue { border-color: #3498db; }
-        .bg-green { border-color: #2ecc71; }
         .bg-red { border-color: #e74c3c; }
-        .infoplayer {border-radius: 10px; border-top: 2px solid;}
+        .infoplayer { border-radius: 10px; border-top: 2px solid; }
 
-        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 2000; color: white; backdrop-filter: blur(5px); }
-        .suit-card { background: white; padding: 30px; border-radius: 20px; text-align: center; color: #333; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        .suit-btns { display: flex; gap: 20px; margin-top: 20px; }
-        .suit-btn { font-size: 3rem; background: #f0f2f5; border: 3px solid #ddd; border-radius: 15px; cursor: pointer; transition: 0.2s; padding: 10px; width: 100px; }
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 2000; color: white; backdrop-filter: blur(5px); transition: opacity 0.3s ease; }
+        .suit-card { background: white; padding: 30px; border-radius: 20px; text-align: center; color: #333; box-shadow: 0 10px 30px rgba(0,0,0,0.5); min-width: 320px; }
+        .suit-btns { display: flex; gap: 20px; margin-top: 20px; justify-content: center; }
+        .suit-btn { font-size: 3rem; background: #f0f2f5; border: 3px solid #ddd; border-radius: 15px; cursor: pointer; transition: 0.2s; padding: 10px; width: 100px; display: flex; align-items: center; justify-content: center; }
         .suit-btn:hover { transform: translateY(-5px); border-color: #764ba2; background: #f3f0ff; }
         .suit-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
         .section { background: rgba(255, 255, 255, 0.95); border-radius: 40px; padding: 2rem; max-width: 1100px; margin: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
         .game-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
-        .player-info { background: #dfe6e9; padding: 15px 30px; border-radius: 20px; min-width: 150px; text-align: center; transition: 0.4s; border: 4px solid t ransparent; }
+        .player-info { background: #dfe6e9; padding: 15px 30px; border-radius: 20px; min-width: 150px; text-align: center; transition: 0.4s; border: 4px solid transparent; }
         .current-player { border-color: #764ba2; background: #fff; box-shadow: 0 0 20px rgba(118, 75, 162, 0.3); transform: scale(1.05); }
 
         .dakon-wood { background: #5d3a1a; padding: 40px; border-radius: 100px; box-shadow: inset 0 0 50px rgba(0,0,0,0.5), 0 15px 30px rgba(0,0,0,0.4); display: flex; align-items: center; gap: 20px; margin: 20px auto; position: relative; border: 10px solid #4a2e15; }
@@ -35,8 +34,11 @@
 
         .notification { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #2d3436; color: white; padding: 12px 30px; border-radius: 30px; display: none; z-index: 3000; font-weight: bold; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
         .hidden { display: none !important; }
+
+        /* Style Tambahan untuk Skor di Modal */
+        .score-box { background: #f8f9fa; padding: 15px; border-radius: 12px; margin: 15px 0; border: 1px solid #eee; }
+        .score-row { display: flex; justify-content: space-between; margin: 5px 0; font-size: 1.1rem; }
     </style>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
 
@@ -47,11 +49,35 @@
             <h2>🖐️ SUIT DULU! ✌️</h2>
             <p>Tentukan siapa yang jalan duluan</p>
             <div class="suit-btns">
-                <button class="suit-btn" onclick="submitSuit('Batu')"></button>
-                <button class="suit-btn" onclick="submitSuit('Gunting')">✂️</button>
-                <button class="suit-btn" onclick="submitSuit('Kertas')">📄</button>
+                <button class="suit-btn" onclick="submitSuit('Batu')"><i class="fas fa-hand-rock"></i></button>
+                <button class="suit-btn" onclick="submitSuit('Gunting')"><i class="fas fa-hand-peace"></i></button>
+                <button class="suit-btn" onclick="submitSuit('Kertas')"><i class="fas fa-hand-paper"></i></button>
             </div>
             <p id="suit-msg" style="margin-top: 15px; color: #666; font-style: italic;">Pilih salah satu...</p>
+        </div>
+    </div>
+
+    <div id="game-over-overlay" class="overlay hidden">
+        <div class="suit-card">
+            <div id="winner-icon" style="font-size: 5rem; margin-bottom: 15px;"></div>
+            <h2 id="winner-status">PERMAINAN SELESAI</h2>
+            
+            <div class="score-box">
+                <div class="score-row">
+                    <span id="res-p1-name">Host</span>
+                    <b id="res-p1-score">0</b>
+                </div>
+                <div class="score-row">
+                    <span id="res-p2-name">Guest</span>
+                    <b id="res-p2-score">0</b>
+                </div>
+            </div>
+            
+            <h3 id="winner-name" style="color: #764ba2; margin-bottom: 20px;"></h3>
+            
+            <button onclick="window.location.href='index.html'" style="background:#6c5ce7; color:white; padding:12px 25px; border-radius:10px; border:none; cursor:pointer; font-weight:bold; width: 100%;">
+                <i class="fas fa-home"></i> Kembali ke Menu
+            </button>
         </div>
     </div>
 
@@ -79,19 +105,19 @@
         </div>
     </div>
 
-    <script src="scfores.js"></script>
-    <div class="stat-card bg-red infoplayer" style="margin-top: 30px;">
+    <div class="stat-card bg-red infoplayer" style="margin-top: 30px; max-width: 1100px; margin-left: auto; margin-right: auto;">
         <h3>Peraturan Permainan</h3>
         <p>1. Setiap pemain memiliki 7 lubang di sisi masing-masing.</p>
-        <p>2. Pemain memulai permainan dengan 4 biji di setiap lubang.</p>
-        <p>3. Pemain memilih lubang untuk memulai permainan.</p>
-        <p>4. Biji akan ditempatkan secara berurutan ke lubang berikutnya.</p>
-        <p>5. Jika berhenti di lubang isi, pemain mendapat giliran tambahan.</p>
-        <p>6. Jika berhenti di lubang kosong sisi sendiri, pemain bisa "menembak" biji lawan.</p>
-        <p>7. Permainan berakhir ketika salah satu sisi kosong.</p>
+        <p>2. Pemain memulai permainan dengan 7 biji di setiap lubang.</p>
+        <p>3. Pilih lubang di sisi Anda untuk mulai menjalankan biji.</p>
+        <p>4. Jika biji terakhir jatuh di lubang besar Anda, Anda dapat giliran tambahan.</p>
+        <p>5. Jika biji terakhir jatuh di lubang kosong sisi Anda, Anda melakukan "Tembak".</p>
     </div>
-    <footer style="text-align:center; margin-top:20px; color:#999; font-size:0.9rem;">
-    &copy; Affan Eka Pradybta, All rights reserved.
+
+    <footer style="text-align:center; margin-top:20px; color:#ddd; font-size:0.9rem; padding-bottom: 20px;">
+        &copy; Affan Eka Pradybta, All rights reserved.
     </footer>
+
+    <script src="scfores.js"></script>
 </body>
 </html>
