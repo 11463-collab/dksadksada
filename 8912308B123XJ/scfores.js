@@ -3,7 +3,6 @@
  * Mendukung Multi-Server (AWS & KOR)
  */
 
-// 1. KONFIGURASI DUA SERVER
 const SERVERS = {
     AWS: {
         url: 'https://yifnqncmsgbkvvjdgwae.supabase.co',
@@ -15,22 +14,20 @@ const SERVERS = {
     }
 };
 
-// 2. AMBIL PARAMETER DARI URL
 const params = new URLSearchParams(window.location.search);
-const myRole = params.get('role'); // 'host' atau 'guest'
+const myRole = params.get('role'); 
 const roomID = params.get('room');
-const selectedServer = params.get('server') || 'AWS'; // Default ke AWS jika tidak ada
+const selectedServer = params.get('server') || 'AWS';
 
-// 3. INISIALISASI CLIENT BERDASARKAN SERVER YANG DIPILIH
 const currentConfig = SERVERS[selectedServer] || SERVERS.AWS;
 const supabaseClient = window.supabase.createClient(currentConfig.url, currentConfig.key);
 
 class DakonGame {
     constructor() {
         this.board = Array(16).fill(7);
-        this.board[7] = 0;  // Lubang besar Host
-        this.board[15] = 0; // Lubang besar Guest
-        this.currentPlayer = 0; // 1 = Host, 2 = Guest
+        this.board[7] = 0;  
+        this.board[15] = 0; 
+        this.currentPlayer = 0; 
         this.gameActive = true;
         this.animationRunning = false;
         this.hostName = "Loading...";
@@ -40,7 +37,6 @@ class DakonGame {
     }
 
     async initGame() {
-        // 1. Ambil Nama & Status awal dari DB (Server yang dipilih)
         const { data, error } = await supabaseClient.from('rooms').select('*').eq('room_id', roomID).single();
         
         if (error || !data || data.status === 'finished') {
@@ -54,16 +50,11 @@ class DakonGame {
         document.getElementById('p1-name').textContent = this.hostName;
         document.getElementById('p2-name').textContent = this.guestName;
         
-        // Tampilkan info Room dan Server di UI
         document.getElementById('room-display').innerHTML = `ROOM ID: ${roomID} <b style="color:#764ba2">(${selectedServer})</b>`;
 
-        // 2. Setup Koneksi Internet Monitoring
         this.setupConnectivityListeners();
-
-        // 3. Setup Realtime & Presence
         this.initRealtime();
         
-        // 4. Cek apakah sudah suit
         if (data.suit_host && data.suit_guest) {
             this.processSuitResult(data.suit_host, data.suit_guest);
         }
@@ -77,7 +68,6 @@ class DakonGame {
             document.getElementById('status').textContent = "OFFLINE";
             document.getElementById('status').style.color = "red";
         });
-
         window.addEventListener('online', () => {
             this.showNotif("✅ Kembali Online.");
             this.updateUI();
@@ -92,25 +82,18 @@ class DakonGame {
         channel
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `room_id=eq.${roomID}` }, (payload) => {
             const data = payload.new;
-
-            // Jika room di-finish oleh server/lawan
             if (data.status === 'finished' && this.gameActive) {
-                this.handleGameEnd("Permainan berakhir atau lawan keluar.");
+                this.checkGameOver(); // Trigger UI End Game
             }
-
-            // Sync Suit
             if (this.currentPlayer === 0 && data.suit_host && data.suit_guest) {
                 this.processSuitResult(data.suit_host, data.suit_guest);
             }
-
-            // Sync Gerakan (Hanya jalankan jika pelakunya BUKAN saya)
             if (data.last_move_by !== myRole && data.last_move !== null) {
                 this.makeMove(parseInt(data.last_move), false);
             }
         })
         .on('presence', { event: 'leave' }, ({ leftPresences }) => {
-            // Jika lawan meninggalkan room
-            if (leftPresences.length > 0) {
+            if (leftPresences.length > 0 && this.gameActive) {
                 this.finishRoom();
             }
         })
@@ -119,21 +102,13 @@ class DakonGame {
                 await channel.track({ online_at: new Date().toISOString() });
             }
         });
-
         this.channel = channel;
     }
 
     async finishRoom() {
         this.gameActive = false;
         await supabaseClient.from('rooms').update({ status: 'finished' }).eq('room_id', roomID);
-        this.handleGameEnd("Lawan terputus. Sesi berakhir.");
-    }
-
-    handleGameEnd(msg) {
-        this.gameActive = false;
-        this.animationRunning = true;
-        alert(msg);
-        window.location.href = 'https://congklak.benevolentclass.my.id/index';
+        this.checkGameOver();
     }
 
     processSuitResult(h, g) {
@@ -143,10 +118,8 @@ class DakonGame {
             Array.from(document.getElementsByClassName('suit-btn')).forEach(b => b.disabled = false);
             return;
         }
-        
         let hostWin = (h==='Batu'&&g==='Gunting') || (h==='Gunting'&&g==='Kertas') || (h==='Kertas'&&g==='Batu');
         this.currentPlayer = hostWin ? 1 : 2;
-        
         document.getElementById('suit-overlay').classList.add('hidden');
         this.showNotif(hostWin ? `${this.hostName} Jalan Duluan!` : `${this.guestName} Jalan Duluan!`);
         this.updateUI();
@@ -156,8 +129,6 @@ class DakonGame {
     async resetSuitDB() {
         await supabaseClient.from('rooms').update({ suit_host: null, suit_guest: null }).eq('room_id', roomID);
     }
-
-    // --- LOGIKA PERMAINAN ---
 
     async makeMove(index, shouldBroadcast) {
         if (this.animationRunning || !this.gameActive) return;
@@ -179,24 +150,19 @@ class DakonGame {
         while (seeds > 0) {
             await new Promise(r => setTimeout(r, 300));
             cur = (cur + 1) % 16;
-            
-            // Lewati lubang besar lawan
             if ((this.currentPlayer === 1 && cur === 15) || (this.currentPlayer === 2 && cur === 7)) {
                 cur = (cur + 1) % 16;
             }
-
             this.board[cur]++;
             this.updateUI();
             seeds--;
         }
 
-        // Logika Berhenti di lubang isi
         if (cur !== 7 && cur !== 15 && this.board[cur] > 1) {
             this.animationRunning = false;
             return this.makeMove(cur, false);
         }
 
-        // Logika Nembak
         const isMySide = (this.currentPlayer === 1 && cur <= 6) || (this.currentPlayer === 2 && cur >= 8 && cur <= 14);
         if (isMySide && this.board[cur] === 1) {
             const oppIdx = 14 - cur;
@@ -209,7 +175,6 @@ class DakonGame {
             }
         }
 
-        // Pindah Giliran
         const myStore = this.currentPlayer === 1 ? 7 : 15;
         if (cur !== myStore) {
             this.currentPlayer = 3 - this.currentPlayer;
@@ -228,16 +193,13 @@ class DakonGame {
         container.innerHTML = '';
         const boardEl = document.createElement('div');
         boardEl.className = 'dakon-wood';
-        
-        boardEl.appendChild(this.createStore(15)); // Guest Store
-        
+        boardEl.appendChild(this.createStore(15)); 
         const pitsGrid = document.createElement('div');
         pitsGrid.className = 'pit-container';
         for(let i = 14; i >= 8; i--) pitsGrid.appendChild(this.createPit(i));
         for(let i = 0; i <= 6; i++) pitsGrid.appendChild(this.createPit(i));
-        
         boardEl.appendChild(pitsGrid);
-        boardEl.appendChild(this.createStore(7)); // Host Store
+        boardEl.appendChild(this.createStore(7)); 
         container.appendChild(boardEl);
     }
 
@@ -246,10 +208,8 @@ class DakonGame {
         pit.className = 'pit';
         pit.id = `pit-${index}`;
         pit.textContent = this.board[index];
-        
         const isP1Pit = index <= 6;
         const isP2Pit = index >= 8 && index <= 14;
-
         if (this.gameActive && !this.animationRunning && this.board[index] > 0) {
             if (this.currentPlayer === 1 && isP1Pit && myRole === 'host') {
                 pit.classList.add('active-p1');
@@ -277,13 +237,10 @@ class DakonGame {
         });
         document.getElementById('p1-score').textContent = this.board[7];
         document.getElementById('p2-score').textContent = this.board[15];
-        
         const p1Info = document.getElementById('p1-info');
         const p2Info = document.getElementById('p2-info');
-        
         p1Info.classList.toggle('current-player', this.currentPlayer === 1);
         p2Info.classList.toggle('current-player', this.currentPlayer === 2);
-        
         if (this.currentPlayer !== 0) {
             document.getElementById('status').textContent = "Giliran: " + (this.currentPlayer === 1 ? this.hostName : this.guestName);
             document.getElementById('status').style.color = this.currentPlayer === 1 ? "#6c5ce7" : "#ff7675";
@@ -301,26 +258,47 @@ class DakonGame {
         const p1Empty = this.board.slice(0, 7).every(s => s === 0);
         const p2Empty = this.board.slice(8, 15).every(s => s === 0);
         
-        if (p1Empty || p2Empty) {
+        if (p1Empty || p2Empty || !this.gameActive) {
             this.gameActive = false;
             const hScore = this.board[7];
             const gScore = this.board[15];
-            let winner = hScore > gScore ? this.hostName : (gScore > hScore ? this.guestName : "Seri");
-            alert(`PERMAINAN SELESAI!\nSkor Akhir:\n${this.hostName}: ${hScore}\n${this.guestName}: ${gScore}\nPemenang: ${winner}`);
-            this.finishRoom();
+            
+            let winnerText = "";
+            let iconHtml = "";
+            let statusText = "GAME OVER";
+
+            if (hScore > gScore) {
+                winnerText = this.hostName + " Menang!";
+                iconHtml = myRole === 'host' ? '<i class="fas fa-trophy" style="color:#f1c40f"></i>' : '<i class="fas fa-heart-broken" style="color:#e74c3c"></i>';
+                statusText = myRole === 'host' ? "SELAMAT! 🎉" : "COBA LAGI... 😅";
+            } else if (gScore > hScore) {
+                winnerText = this.guestName + " Menang!";
+                iconHtml = myRole === 'guest' ? '<i class="fas fa-trophy" style="color:#f1c40f"></i>' : '<i class="fas fa-heart-broken" style="color:#e74c3c"></i>';
+                statusText = myRole === 'guest' ? "SELAMAT! 🎉" : "COBA LAGI... 😅";
+            } else {
+                winnerText = "Hasil Seri!";
+                iconHtml = '<i class="fas fa-handshake" style="color:#3498db"></i>';
+                statusText = "SAMA KUAT!";
+            }
+
+            document.getElementById('winner-icon').innerHTML = iconHtml;
+            document.getElementById('winner-status').textContent = statusText;
+            document.getElementById('winner-name').textContent = winnerText;
+            document.getElementById('res-p1-name').textContent = this.hostName;
+            document.getElementById('res-p1-score').textContent = hScore;
+            document.getElementById('res-p2-name').textContent = this.guestName;
+            document.getElementById('res-p2-score').textContent = gScore;
+
+            document.getElementById('game-over-overlay').classList.remove('hidden');
         }
     }
 }
 
-// Fungsi Suit Global
 async function submitSuit(choice) {
     const col = myRole === 'host' ? 'suit_host' : 'suit_guest';
     document.getElementById('suit-msg').textContent = "Menunggu lawan...";
     Array.from(document.getElementsByClassName('suit-btn')).forEach(b => b.disabled = true);
-    
-    // Kirim data suit ke server yang sedang aktif
     await supabaseClient.from('rooms').update({ [col]: choice }).eq('room_id', roomID);
 }
 
-// Start Game Engine
 const game = new DakonGame();
