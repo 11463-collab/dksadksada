@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dakon Panel - Security Auth</title>
+    
+    <script>
+        // --- PROTEKSI SESI DINAMIS ---
+        const urlParams = new URLSearchParams(window.location.search);
+        const keyInUrl = urlParams.get('key');
+        const keyInMemory = sessionStorage.getItem('active_session_key');
+
+        // Jika Key di URL tidak sama dengan yang di-generate saat login tadi
+        if (!keyInUrl || keyInUrl !== keyInMemory) {
+            window.addEventListener('DOMContentLoaded', () => {
+                document.body.innerHTML = `
+                <div style="background:#0a0a0a; color:#ff4d6d; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; font-family:monospace; text-align:center;">
+                    <i class="fas fa-ban" style="font-size:5rem; margin-bottom:20px;"></i>
+                    <h1 style="font-size:3.5rem; margin:0;">KEY NOT AUTH!</h1>
+                    <p style="font-size:1.2rem; border: 1px solid #ff4d6d; padding: 15px; margin: 20px; max-width: 80%;">
+                        AKSES DITOLAK: Sesi ini tidak terdaftar atau Anda mencoba masuk tanpa melalui Login Page secara sah.
+                    </p>
+                    <a href="login.html" style="color:#00d4ff; text-decoration:none; font-weight:bold; border: 1px solid #00d4ff; padding: 10px 20px; border-radius:5px;">← KEMBALI LOGIN</a>
+                </div>`;
+            });
+            window.isBlocked = true;
+        }
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+    <style>
+        :root { --p: #3498db; --s: #9b59b6; --bg: #f0f2f5; --danger: #e74c3c; --warning: #f1c40f; --success: #2ecc71; --dark: #2c3e50; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; color: var(--dark); }
+        .header { background: var(--dark); color: white; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 4px solid var(--p); }
+        .container { max-width: 1300px; margin: 20px auto; padding: 0 20px; display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+        .card { background: white; border-radius: 12px; padding: 25px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        
+        /* Stats & Ping */
+        .ping-tag { font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; background: #eee; margin-left: 10px; font-weight: bold; }
+        .ping-good { color: var(--success); }
+        .ping-slow { color: var(--danger); }
+        
+        .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 20px; }
+        .stat-item { background: #f8f9fa; padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #eee; }
+        .stat-item h3 { margin: 5px 0; font-size: 1.6rem; color: var(--dark); }
+        .stat-item small { color: #7f8c8d; font-weight: bold; font-size: 0.7rem; text-transform: uppercase; }
+
+        /* Status Badge */
+        .badge { padding: 4px 10px; border-radius: 5px; font-weight: bold; font-size: 0.7rem; }
+        .st-play { background: #e8f5e9; color: var(--success); }
+        .st-lobby { background: #fff8e1; color: var(--warning); }
+        .st-finish { background: #eceff1; color: #607d8b; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th { text-align: left; padding: 12px; font-size: 0.7rem; color: #95a5a6; border-bottom: 2px solid #eee; }
+        td { padding: 12px; border-bottom: 1px solid #eee; font-size: 0.9rem; }
+        
+        .btn-clean { background: var(--dark); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .btn-clean:hover { background: #000; }
+        .btn-logout { background: transparent; color: white; border: 1px solid #fff; padding: 5px 15px; border-radius: 4px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div><i class="fas fa-shield-halved"></i> <b>DAKON GLOBAL ADMIN PANEL</b></div>
+    <div style="display:flex; align-items:center; gap:20px;">
+        <span style="font-family:monospace; font-size:0.8rem;">ID: <span id="key-display" style="color:var(--success)"></span></span>
+        <button class="btn-logout" onclick="logout()">LOGOUT</button>
+    </div>
+</div>
+
+<div class="container">
+    <div class="left-col">
+        <div class="card">
+            <h3 style="margin:0"><i class="fas fa-network-wired"></i> Network Health</h3>
+            <div style="display: flex; gap: 40px; margin-top:15px;">
+                <div>
+                    <small>AWS Singapore Node</small>
+                    <div style="display:flex; align-items:center;"><h2 style="margin:0; color:var(--p)" id="aws-count">0</h2><span id="aws-ping" class="ping-tag">--ms</span></div>
+                </div>
+                <div>
+                    <small>KOR Seoul Node</small>
+                    <div style="display:flex; align-items:center;"><h2 style="margin:0; color:var(--s)" id="kor-count">0</h2><span id="kor-ping" class="ping-tag">--ms</span></div>
+                </div>
+            </div>
+
+            <div class="stats-row">
+                <div class="stat-item"><h3><i class="fas fa-gamepad"></i></h3><small>Playing</small><div id="n-play">0</div></div>
+                <div class="stat-item"><h3><i class="fas fa-hourglass-half"></i></h3><small>Lobby</small><div id="n-lobby">0</div></div>
+                <div class="stat-item"><h3><i class="fas fa-flag-checkered"></i></h3><small>Finished</small><div id="n-finish">0</div></div>
+                <div class="stat-item"><h3><i class="fas fa-users"></i></h3><small>Total User</small><div id="n-total">0</div></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h3 style="margin:0"><i class="fas fa-list-ul"></i> Master Room List</h3>
+                <button class="btn-clean" onclick="cleanFinished()">
+                    <i class="fas fa-broom"></i> Bersihkan Room Finished
+                </button>
+            </div>
+            <table>
+                <thead>
+                    <tr><th>Server</th><th>ID Room</th><th>Host Name</th><th>Status</th><th>Aksi</th></tr>
+                </thead>
+                <tbody id="master-list"></tbody>
+            </table>
+            
+            <div style="background:#fff3f3; color:#c0392b; padding:15px; border-radius:8px; margin-top:20px; font-size:0.8rem; border: 1px solid #ffcccc;">
+                <b>CATATAN ADMINISTRATOR:</b> <i>Clean Finished</i> hanya menghapus room yang sudah ditinggalkan/selesai.Administrator dilarang keras menghapus room <b>LOBBY atau PLAYING</b>. Karena bisa menyebabkan pemain yang sedang menunggu atau bermain kehilangan progress dan data mereka. Gunakan fitur hapus room individual jika ingin menghapus room tertentu.
+            </div>
+        </div>
+    </div>
+
+    <div class="right-col">
+        <div class="card" style="text-align:center">
+            <h3>Player Distribution</h3>
+            <canvas id="playerChart"></canvas>
+            <div style="margin-top:30px; padding:15px; background:#f8f9fa; border-radius:10px;">
+                <h1 id="total-val" style="margin:0">0</h1>
+                <small>PLAYERS CONNECTED</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    if (window.isBlocked) throw new Error("Auth Failure");
+
+    document.getElementById('key-display').textContent = keyInUrl;
+
+    const S1_URL = 'https://yifnqncmsgbkvvjdgwae.supabase.co';
+    const S1_KEY = 'sb_publishable_F47wIask3Ld1QT8Hfvgu-Q_hxHPnYRj';
+    const S2_URL = 'https://qouaeainjscoidchwtgm.supabase.co';
+    const S2_KEY = 'sb_publishable_3O3MN8Kvk__XDfwe5CO_Ug_ux1g33l-';
+    
+    const client1 = window.supabase.createClient(S1_URL, S1_KEY);
+    const client2 = window.supabase.createClient(S2_URL, S2_KEY);
+
+    let playerChart;
+    const ctx = document.getElementById('playerChart').getContext('2d');
+    playerChart = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: ['AWS SGP', 'KOR SEL'],
+            datasets: [{ data: [0, 0], backgroundColor: ['#3498db', '#9b59b6'], borderWidth: 0 }]
+        },
+        options: { plugins: { legend: { position: 'bottom' } } }
+    });
+
+    async function checkPing(url, elId) {
+        const start = Date.now();
+        try {
+            await fetch(url, { mode: 'no-cors' });
+            const lat = Date.now() - start;
+            const el = document.getElementById(elId);
+            el.textContent = `${lat}ms`;
+            el.className = `ping-tag ${lat < 300 ? 'ping-good' : 'ping-slow'}`;
+        } catch(e) { document.getElementById(elId).textContent = "ERR"; }
+    }
+
+    async function refresh() {
+        checkPing(S1_URL, 'aws-ping');
+        checkPing(S2_URL, 'kor-ping');
+
+        const { data: d1 } = await client1.from('rooms').select('*');
+        const { data: d2 } = await client2.from('rooms').select('*');
+
+        const combined = [...d1.map(r=>({...r, srv:'AWS'})), ...d2.map(r=>({...r, srv:'KOR'}))];
+        
+        // LOGIKA FILTER STATUS
+        const play = combined.filter(r => r.is_started === true);
+        const lobby = combined.filter(r => r.is_started === false && !r.guest_name);
+        const finished = combined.filter(r => r.is_started === false && r.guest_name);
+
+        document.getElementById('aws-count').textContent = d1.length;
+        document.getElementById('kor-count').textContent = d2.length;
+        document.getElementById('n-play').textContent = play.length;
+        document.getElementById('n-lobby').textContent = lobby.length;
+        document.getElementById('n-finish').textContent = finished.length;
+        document.getElementById('n-total').textContent = (play.length * 2) + lobby.length;
+        document.getElementById('total-val').textContent = (play.length * 2) + lobby.length;
+
+        playerChart.data.datasets[0].data = [d1.length, d2.length];
+        playerChart.update();
+
+        document.getElementById('master-list').innerHTML = combined.map(room => {
+            let sCls = 'st-lobby', sTxt = 'LOBBY';
+            if(room.is_started) { sCls = 'st-play'; sTxt = 'PLAYING'; }
+            else if(room.guest_name) { sCls = 'st-finish'; sTxt = 'FINISHED'; }
+
+            return `
+                <tr>
+                    <td><b style="color:${room.srv==='AWS'?'var(--p)':'var(--s)'}">${room.srv}</b></td>
+                    <td><code>${room.room_id}</code></td>
+                    <td>${room.host_name || 'System'}</td>
+                    <td><span class="badge ${sCls}">${sTxt}</span></td>
+                    <td><button onclick="del('${room.srv}','${room.room_id}')" style="color:var(--danger); border:none; background:none; cursor:pointer"><i class="fa fa-trash"></i></button></td>
+                </tr>
+            `;
+        }).join('') || '<tr><td colspan="5" style="text-align:center">No active connections.</td></tr>';
+    }
+
+    async function cleanFinished() {
+        if(!confirm("Bersihkan room yang sudah selesai? Pemain yang menunggu di Lobby tidak akan terhapus.")) return;
+        // Hapus: is_started=false DAN guest_name != null
+        await client1.from('rooms').delete().eq('is_started', false).not('guest_name', 'is', null);
+        await client2.from('rooms').delete().eq('is_started', false).not('guest_name', 'is', null);
+        refresh();
+    }
+
+    async function del(srv, id) {
+        if(!confirm('Hapus Room ' + id + '?')) return;
+        const target = srv === 'AWS' ? client1 : client2;
+        await target.from('rooms').delete().eq('room_id', id);
+        refresh();
+    }
+
+    function logout() {
+        sessionStorage.clear();
+        window.location.href = "login";
+    }
+
+    setInterval(refresh, 5000);
+    refresh();
+</script>
+</body>
+</html>

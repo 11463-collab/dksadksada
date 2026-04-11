@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dakon Login - Security Gateway</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body { 
+            margin: 0; height: 100vh; display: flex; align-items: center; justify-content: center;
+            background: #0f0c29; font-family: 'Segoe UI', sans-serif; color: white;
+            background: linear-gradient(to right, #0f0c29, #302b63, #24243e);
+        }
+        .login-card {
+            background: rgba(20, 30, 48, 0.95); padding: 40px; border-radius: 15px; width: 350px;
+            box-shadow: 0 0 25px rgba(0, 212, 255, 0.3); border: 1px solid #00d4ff; text-align: center;
+        }
+        h2 { letter-spacing: 2px; margin-bottom: 5px; }
+        input {
+            width: 100%; padding: 12px; margin: 10px 0; border-radius: 5px; border: 1px solid #00d4ff;
+            background: #1a1a2e; color: white; box-sizing: border-box; outline: none;
+        }
+        button {
+            width: 100%; padding: 12px; background: #00d4ff; border: none; border-radius: 5px;
+            color: #0f0c29; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 15px;
+        }
+        button:hover { background: #008cff; color: white; box-shadow: 0 0 15px #00d4ff; }
+        .error { color: #ff4d6d; font-size: 0.8rem; display: none; margin-top: 10px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="login-card">
+    <i class="fas fa-user-shield fa-3x" style="color: #00d4ff; margin-bottom: 20px;"></i>
+    <h2>DAKON ADMIN</h2>
+    <p style="color: #888; font-size: 0.8rem; margin-bottom: 20px;">GENERATE DYNAMIC SESSION KEY</p>
+    
+    <input type="text" id="user" placeholder="Username">
+    <input type="password" id="pass" placeholder="Password">
+    <button onclick="generateAccess()">AUTHORIZE & ENTER</button>
+    <div id="err" class="error"><i class="fas fa-exclamation-circle"></i> KREDENSIAL TIDAK SAH!</div>
+</div>
+
+<script>
+    // Daftar User yang diizinkan (Bisa ditambah sesuai kebutuhan)
+    const usersDatabase = [
+        { user: "Affannnn", pass: "AppanImut", role: "Super Admin" },
+        { user: "moderator_1", pass: "mod123", role: "Moderator AWS" },
+        { user: "moderator_2", pass: "mod456", role: "Moderator KOR" }
+    ];
+
+    function generateAccess() {
+        const u = document.getElementById('user').value;
+        const p = document.getElementById('pass').value;
+
+        const foundUser = usersDatabase.find(account => account.user === u && account.pass === p);
+
+        if(foundUser) {
+            const sessionId = "DKN-" + Math.random().toString(36).substring(2, 10).toUpperCase() + Date.now();
+            
+            sessionStorage.setItem('active_session_key', sessionId);
+            sessionStorage.setItem('admin_name', foundUser.user);
+            sessionStorage.setItem('admin_role', foundUser.role);
+            window.location.href = "admin?key=" + sessionId; 
+        } else {
+            document.getElementById('err').style.display = 'block';
+            document.getElementById('err').innerHTML = '<i class="fas fa-exclamation-circle"></i> USER TIDAK DITEMUKAN!';
+        }
+    }
+</script>
+</body>
+</html>
